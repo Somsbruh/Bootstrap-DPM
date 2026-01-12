@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Clinic {
+  id              String           @id @default(uuid())
+  name            String
+  address         String?
+  phone           String?
+  email           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  users           User[]
+  patients        Patient[]
+  doctors         Doctor[]
+  categories      Category[]
+  medicines       Medicine[]
+  transactions    Transaction[]
+  inventoryItems  InventoryItem[]
+  systemSettings  SystemSettings?
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String     @default("RECEPTIONIST")
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSettings {
+  id            String @id @default(uuid())
+  clinicId      String @unique
+  clinic        Clinic @relation(fields: [clinicId], references: [id])
+  exchangeRate  Float  @default(4100) // 1 USD = X KHR
+  updatedAt     DateTime @updatedAt
+}
+
+model Doctor {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  email     String?
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     TransactionItem[]
+}
+
+model Category {
+  id          String      @id @default(uuid())
+  name        String
+  clinicId    String
+  clinic      Clinic      @relation(fields: [clinicId], references: [id])
+  treatments  Treatment[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Treatment {
+  id            String            @id @default(uuid())
+  name          String
+  categoryId    String
+  category      Category          @relation(fields: [categoryId], references: [id])
+  clinicId      String
+  defaultPrice  Float             @default(0) // USD
+  isCustomPrice Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  items         TransactionItem[]
+}
+
+model Medicine {
+  id             String            @id @default(uuid())
+  name           String
+  description    String?
+  clinicId       String
+  clinic         Clinic            @relation(fields: [clinicId], references: [id])
+  costPrice      Float             @default(0) // USD
+  salePrice      Float             @default(0) // USD
+  lowStockLevel  Int               @default(5)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  inventoryItems InventoryItem[]
+  transactionItems TransactionItem[]
+}
+
+model InventoryItem {
+  id             String   @id @default(uuid())
+  medicineId     String
+  medicine       Medicine @relation(fields: [medicineId], references: [id])
+  clinicId       String
+  clinic         Clinic   @relation(fields: [clinicId], references: [id])
+  centralStock   Int      @default(0) // Upstairs
+  dispensingStock Int      @default(0) // Downstairs
+  updatedAt      DateTime @updatedAt
+
+  @@unique([medicineId, clinicId])
+}
+
+model Patient {
+  id        String   @id @default(uuid())
+  name      String
+  sex       String?
+  age       Int?
+  phone     String?
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  transactions Transaction[]
+  photos    PatientPhoto[]
+}
+
+model PatientPhoto {
+  id        String   @id @default(uuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  url       String
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  patientId     String
+  patient       Patient           @relation(fields: [patientId], references: [id])
+  clinicId      String
+  clinic        Clinic            @relation(fields: [clinicId], references: [id])
+  totalAmount   Float             @default(0) // USD
+  status        String            @default("ACTIVE")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  items         TransactionItem[]
+  payments      Payment[]
+}
+
+model TransactionItem {
+  id            String      @id @default(uuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  treatmentId   String?
+  treatment     Treatment?  @relation(fields: [treatmentId], references: [id])
+  medicineId    String?
+  medicine      Medicine?   @relation(fields: [medicineId], references: [id])
+  doctorId      String?
+  doctor        Doctor?     @relation(fields: [doctorId], references: [id])
+  quantity      Int         @default(1)
+  unitPrice     Float       @default(0) // USD
+  subtotal      Float       @default(0) // USD
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  transactionId String
+  transaction   Transaction   @relation(fields: [transactionId], references: [id])
+  method        String        @default("CASH")
+  amount        Float         @default(0) // USD
+  createdAt     DateTime      @default(now())
+}
